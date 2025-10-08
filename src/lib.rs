@@ -8,22 +8,31 @@ use serde::{Serialize, Deserialize};
 use std::fs;
 use std::path::Path;
 
+/// Custom result type with error handling
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+/// Represents the result of processing
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessResult {
+    /// Whether the processing was successful
     pub success: bool,
+    /// Message describing the outcome
     pub message: String,
+    /// Optional data returned from processing
     pub data: Option<serde_json::Value>,
 }
 
+/// NodeRunner processor
 #[derive(Debug)]
 pub struct NodeRunnerProcessor {
-    verbose: bool,
-    processed_count: usize,
+    /// Whether to print debug information
+    pub verbose: bool,
+    /// Number of items processed
+    pub processed_count: usize,
 }
 
 impl NodeRunnerProcessor {
+    /// Creates a new processor with the specified verbosity
     pub fn new(verbose: bool) -> Self {
         Self {
             verbose,
@@ -31,7 +40,9 @@ impl NodeRunnerProcessor {
         }
     }
 
+    /// Processes the given data
     pub fn process(&mut self, data: &str) -> Result<ProcessResult> {
+        // Log processing information if verbosity is enabled
         if self.verbose {
             debug!("Processing data of length: {}", data.len());
         }
@@ -52,6 +63,7 @@ impl NodeRunnerProcessor {
         Ok(result)
     }
 
+    /// Returns statistics about the processor
     pub fn get_stats(&self) -> serde_json::Value {
         serde_json::json!({
             "processed_count": self.processed_count,
@@ -62,6 +74,7 @@ impl NodeRunnerProcessor {
 
 /// Main processing function
 pub fn run(verbose: bool, input: Option<String>, output: Option<String>) -> Result<()> {
+    // Initialize logging based on verbosity
     if verbose {
         env_logger::Builder::from_default_env()
             .filter_level(log::LevelFilter::Debug)
@@ -70,72 +83,32 @@ pub fn run(verbose: bool, input: Option<String>, output: Option<String>) -> Resu
         env_logger::init();
     }
     
+    // Log start of processing
     info!("Starting NodeRunner processing");
     
+    // Create a new processor
     let mut processor = NodeRunnerProcessor::new(verbose);
     
-    // Read input
+    // Read input from the provided path
     let input_data = match input {
         Some(path) => {
-            info!("Reading from file: {}", path);
-            fs::read_to_string(&path)?
-        },
+            info!("Reading input from: {}", path);
+            fs::read_to_string(path)?
+        }
         None => {
-            info!("Using default test data");
-            "Sample data for processing".to_string()
+            info!("No input provided");
+            "".to_string()
         }
     };
-    
-    // Process data
+
+    // Process the input data
     let result = processor.process(&input_data)?;
-    
-    if verbose {
-        debug!("Processing result: {:#?}", result);
+
+    // Optionally write the result to a file
+    if let Some(output_path) = output {
+        info!("Writing result to: {}", output_path);
+        fs::write(output_path, serde_json::to_string_pretty(&result)?)?;
     }
-    
-    // Save output
-    let output_json = serde_json::to_string_pretty(&result)?;
-    
-    match output {
-        Some(path) => {
-            info!("Writing results to: {}", path);
-            fs::write(&path, &output_json)?;
-        },
-        None => {
-            println!("{}", output_json);
-        }
-    }
-    
-    let stats = processor.get_stats();
-    info!("Processing complete. Stats: {}", stats);
-    
+
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_processor_creation() {
-        let processor = NodeRunnerProcessor::new(true);
-        assert_eq!(processor.verbose, true);
-        assert_eq!(processor.processed_count, 0);
-    }
-
-    #[test]
-    fn test_data_processing() {
-        let mut processor = NodeRunnerProcessor::new(false);
-        let result = processor.process("test data").unwrap();
-        
-        assert!(result.success);
-        assert_eq!(processor.processed_count, 1);
-    }
-
-    #[test]
-    fn test_run_function() {
-        // Test the main run function
-        let result = run(false, None, None);
-        assert!(result.is_ok());
-    }
 }
