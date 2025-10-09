@@ -9,9 +9,11 @@ use std::fs;
 use std::path::Path;
 
 /// Custom result type with error handling
+/// # Type alias for a Result type with a boxed error
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// Represents the result of processing
+/// # Struct containing the outcome of processing
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProcessResult {
     /// Whether the processing was successful
@@ -23,6 +25,7 @@ pub struct ProcessResult {
 }
 
 /// NodeRunner processor
+/// # Struct representing the processor with verbosity and processed count
 #[derive(Debug)]
 pub struct NodeRunnerProcessor {
     /// Whether to print debug information
@@ -33,6 +36,7 @@ pub struct NodeRunnerProcessor {
 
 impl NodeRunnerProcessor {
     /// Creates a new processor with the specified verbosity
+    /// # Creates a new instance of the processor with verbosity
     pub fn new(verbose: bool) -> Self {
         Self {
             verbose,
@@ -41,6 +45,9 @@ impl NodeRunnerProcessor {
     }
 
     /// Processes the given data
+    /// # Processes the data and returns the result
+    /// # Arguments:
+    /// * `data`: The data to process as a string
     pub fn process(&mut self, data: &str) -> Result<ProcessResult> {
         // Log processing information if verbosity is enabled
         if self.verbose {
@@ -64,51 +71,11 @@ impl NodeRunnerProcessor {
     }
 
     /// Returns statistics about the processor
+    /// # Returns statistics as a JSON value
     pub fn get_stats(&self) -> serde_json::Value {
         serde_json::json!({
             "processed_count": self.processed_count,
             "verbose": self.verbose
         })
     }
-}
-
-/// Main processing function
-pub fn run(verbose: bool, input: Option<String>, output: Option<String>) -> Result<()> {
-    // Initialize logging based on verbosity
-    if verbose {
-        env_logger::Builder::from_default_env()
-            .filter_level(log::LevelFilter::Debug)
-            .init();
-    } else {
-        env_logger::init();
-    }
-    
-    // Log start of processing
-    info!("Starting NodeRunner processing");
-    
-    // Create a new processor
-    let mut processor = NodeRunnerProcessor::new(verbose);
-    
-    // Read input from the provided path
-    let input_data = match input {
-        Some(path) => {
-            info!("Reading input from: {}", path);
-            fs::read_to_string(path)?
-        }
-        None => {
-            info!("No input provided");
-            "".to_string()
-        }
-    };
-
-    // Process the input data
-    let result = processor.process(&input_data)?;
-
-    // Optionally write the result to a file
-    if let Some(output_path) = output {
-        info!("Writing result to: {}", output_path);
-        fs::write(output_path, serde_json::to_string_pretty(&result)?)?;
-    }
-
-    Ok(())
 }
